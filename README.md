@@ -1,6 +1,6 @@
 # Gaza Humanitarian Air Bridge — Cargo Scheduling CSP
 
-**CSCI218 — Artificial Intelligence | Group 5 | University of Wollongong in Dubai | Autumn 2026**
+**CSCI218 — Artificial Intelligence**
 
 A constraint satisfaction system that schedules humanitarian cargo (medical supplies, food, water, shelter) onto aircraft flight slots while respecting capacity, urgency, cold-chain, hazmat, and time-window constraints.
 
@@ -153,13 +153,3 @@ python -m pytest tests/
 ```
 
 ---
-
-## Team Contributions
-
-| Member | Role | Sections |
-|---|---|---|
-| Fawaz Rehman | Core CSP Model & Base Solver | `model.py`, `csp.py`, `solver.py`, `demo_instance.py` · Report §(d) |
-| Nabeel | Performance & Optimisation Engineer | `optimization.py`, `benchmark_optimization.py` · Report §(b) |
-| *(Data Pipeline)* | Data Pipeline & Synthetic Dataset Generator | `demo_instance.py` extensions, JSON/CSV loader · Report §(a), §(c) |
-| Eyad Genina | Experiments, Metrics & Baseline Benchmarking | `run_experiments.py`, `plot_results.py`, `greedy_baseline.py`, `tests/` · Report §(f) |
-| Amaan | Visual Dashboard, GitHub Lead & Report Assembly | `dashboard.py`, `README.md`, report assembly · Report §(e), §(g), §(h) |
