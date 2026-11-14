@@ -16,6 +16,10 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))        # so "humanitarian_csp" can be imported
 
 from humanitarian_csp import BacktrackingSolver, HumanitarianCSP, evaluate, make_demo_instance
+from humanitarian_csp.optimization import (
+    mrv_degree_selector, lcv_value_orderer, forward_checking, forward_checking_ac3,
+)
+from humanitarian_csp.solver import static_var_selector, static_value_orderer, no_inference
 from greedy_baseline import greedy_feasible, greedy_naive
 
 SIZES = {"small": 50, "medium": 200, "large": 500}
@@ -42,12 +46,48 @@ def run_greedy_feasible(instance, time_limit):
     return greedy_feasible(instance), {}
 
 
+def run_csp_mrv_fc(instance, time_limit):
+    csp = HumanitarianCSP(instance)
+    res = BacktrackingSolver(
+        csp,
+        var_selector=mrv_degree_selector,
+        value_orderer=lcv_value_orderer,
+        inference=forward_checking,
+        time_limit_s=time_limit,
+    ).solve()
+    return res.plan, {
+        "timed_out": res.stats.timed_out,
+        "proven_optimal": res.proven_optimal,
+        "nodes": res.stats.nodes,
+        "backtracks": res.stats.backtracks,
+        "constraint_checks": res.stats.constraint_checks,
+    }
+
+
+def run_csp_mrv_fc_ac3(instance, time_limit):
+    csp = HumanitarianCSP(instance)
+    res = BacktrackingSolver(
+        csp,
+        var_selector=mrv_degree_selector,
+        value_orderer=lcv_value_orderer,
+        inference=forward_checking_ac3,
+        time_limit_s=time_limit,
+    ).solve()
+    return res.plan, {
+        "timed_out": res.stats.timed_out,
+        "proven_optimal": res.proven_optimal,
+        "nodes": res.stats.nodes,
+        "backtracks": res.stats.backtracks,
+        "constraint_checks": res.stats.constraint_checks,
+    }
+
+
 ALGORITHMS = {
     "CSP-Backtracking": run_csp_baseline,
+    "CSP+MRV+LCV+FC": run_csp_mrv_fc,
+    "CSP+MRV+LCV+FC+AC3": run_csp_mrv_fc_ac3,
     "Greedy-Naive": run_greedy_naive,
     "Greedy-Feasible": run_greedy_feasible,
-    # LATER: add the heuristic versions once optimization.py is reviewed, e.g.
-    # "CSP+MRV+FC": run_csp_with_heuristics,
 }
 
 FIELDS = ["size", "n_items", "trial", "seed", "algorithm", "time_ms", "total_cost",
