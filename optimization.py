@@ -1,29 +1,247 @@
+
 """
 Optimization hooks for the Humanitarian Cargo Scheduling CSP.
 
-Drop this file into the humanitarian_csp package as optimization.py
-(or adjust the import in benchmark_optimization.py).
-
 Implements:
-  - MRV (Minimum Remaining Values)
-  - Degree heuristic (tie-breaker for MRV, plus standalone selector)
-  - LCV (Least Constraining Value)
-  - Forward Checking
-  - AC-3 over the CSP's explicit binary conflict graph
-
-Important modelling note:
-  Capacity constraints C3-C5 are global/n-ary, so Forward Checking handles
-  them using the current residual aircraft capacities. AC-3 handles C6,
-  the explicit hazmat-versus-sensitive binary constraint. Because UNASSIGNED
-  remains a legal fallback value, AC-3 may make few or no extra removals;
-  this is correct, not a bug.
+- MRV (Minimum Remaining Values)
+- Degree heuristic
+- LCV (Least Constraining Value)
+- Forward Checking
+- AC-3 over the binary conflict graph
 """
+
 from collections import deque
 
-from humanitarian_csp.csp import UNASSIGNED
+from .csp import UNASSIGNED
 
-# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------
 # Variable-ordering heuristics
+
+def mrv_selector(csp, assignment, domains, unassigned):
+    """Choose the variable with the fewest remaining values."""
+    return min(unassigned, key=lambda v: (len(domains[v]), v))
+
+
+def degree_selector(csp, assignment, domains, unassigned):
+    """Choose the variable connected to the most undecided variables."""
+    undecided = set(unassigned)
+
+    return max(
+        unassigned,
+        key=lambda v: (
+            sum(1 for n in csp.neighbors(v) if n in undecided),
+            -v,
+        ),
+    )
+
+
+def mrv_degree_selector(csp, assignment, domains, unassigned):
+    """MRV with degree as a tie-breaker."""
+    undecided = set(unassigned)
+
+    def key(v):
+        degree = sum(
+            1 for n in csp.neighbors(v)
+            if n in undecided
+        )
+        return (len(domains[v]), -degree, v)
+
+    return min(unassigned, key=key)
+
+
+# ---------------------------------------------------------
+# Value-ordering heuristic
+
+def _estimated_pruned_values(csp, var, value, assignment, domains):
+    """Estimate how many choices this value removes from other variables."""
+
+    if value == UNASSIGNED:
+        return 0
+
+    item = csp.items[var]
+
+    rem_w, rem_v, rem_cold = assignment.residual(value)
+
+    rem_w -= item.weight_kg
+    rem_v -= item.volume_m3
+
+    if item.cold_chain:
+        rem_cold -= item.volume_m3
+
+    score = 0
+
+    for other in range(csp.n_vars):
+        if other == var or assignment.value[other] is not None:
+            continue
+
+        other_item = csp.items[other]
+
+        for other_value in domains[other]:
+            if other_value == UNASSIGNED:
+                continue
+
+            if not csp.binary_ok(var, value, other, other_value):
+                score += 1
+                continue
+
+            if other_value == value:
+                if (
+                    rem_w + 1e-9 < other_item.weight_kg
+                    or rem_v + 1e-9 < other_item.volume_m3
+                    or (
+                        other_item.cold_chain
+                        and rem_cold + 1e-9 < other_item.volume_m3
+                    )
+                ):
+                    score += 1
+
+    return score
+
+
+def lcv_value_orderer(csp, var, assignment, domains):
+    """Try least-constraining values first."""
+
+    values = list(domains[var])
+
+    real_values = [
+        v for v in values
+        if v != UNASSIGNED
+    ]
+
+    real_values.sort(
+        key=lambda v: (
+            _estimated_pruned_values(
+                csp, var, v, assignment, domains
+            ),
+            csp.assigned_cost[var][v],
+        )
+    )
+
+    if UNASSIGNED in values:
+        real_values.append(UNASSIGNED)
+
+    return real_values
+
+
+# ---------------------------------------------------------
+# Forward Checking
+
+def forward_checking(csp, var, value, assignment, domains):
+    """
+    Remove values that are no longer feasible.
+
+    Returns:
+        A list of pruned (variable, value) pairs on success.
+        None if a domain becomes empty.
+    """
+
+    pruned = []
+
+    if value == UNASSIGNED:
+        return pruned
+
+    for other in range(csp.n_vars):
+
+        if assignment.value[other] is not None:
+            continue
+
+        for candidate in list(domains[other]):
+
+            if candidate == UNASSIGNED:
+                continue
+
+            if assignment.violation(other, candidate) is not None:
+                domains[other].remove(candidate)
+                pruned.append((other, candidate))
+
+        if not domains[other]:
+
+            # Restore all changes if a domain becomes empty.
+            for v, x in reversed(pruned):
+                domains[v].append(x)
+
+            return None
+
+    return pruned
+
+
+# ---------------------------------------------------------
+# AC-3
+
+def ac3(csp, domains, initial_arcs=None, pruned=None):
+    """AC-3 algorithm for the explicit binary conflict constraints."""
+
+    if pruned is None:
+        pruned = []
+
+    if initial_arcs is None:
+        queue = deque(
+            (i, j)
+            for i in range(csp.n_vars)
+            for j in csp.neighbors(i)
+            if domains[i] and domains[j]
+        )
+    else:
+        queue = deque(initial_arcs)
+
+    while queue:
+
+        xi, xj = queue.popleft()
+        revised = False
+
+        for x in list(domains[xi]):
+
+            supported = any(
+                csp.binary_ok(xi, x, xj, y)
+                for y in domains[xj]
+            )
+
+            if not supported:
+                domains[xi].remove(x)
+                pruned.append((xi, x))
+                revised = True
+
+        if not domains[xi]:
+            return None
+
+        if revised:
+            for xk in csp.neighbors(xi):
+                if xk != xj:
+                    queue.append((xk, xi))
+
+    return pruned
+
+
+# ---------------------------------------------------------
+# Combined Forward Checking + AC-3
+
+def forward_checking_ac3(csp, var, value, assignment, domains):
+    """Apply Forward Checking followed by AC-3."""
+
+    pruned = forward_checking(
+        csp, var, value, assignment, domains
+    )
+
+    if pruned is None:
+        return None
+
+    result = ac3(
+        csp,
+        domains,
+        pruned=pruned,
+    )
+
+    if result is None:
+
+        # Restore all pruned values if AC-3 fails.
+        for v, x in reversed(pruned):
+            domains[v].append(x)
+
+        return None
+
+    return pruned
+
 
 def mrv_selector(csp, assignment, domains, unassigned):
     """Choose the undecided item with the fewest remaining legal values."""
