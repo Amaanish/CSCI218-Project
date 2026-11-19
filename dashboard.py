@@ -14,6 +14,7 @@ import pandas as pd
 import streamlit as st
 
 # Ensure the project root is on Python's import path
+# Ensure the project root is on Python's import path
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 if HERE not in sys.path:
@@ -41,15 +42,6 @@ from humanitarian_csp.solver import (
     static_value_orderer,
     no_inference,
 )
-
-
-from humanitarian_csp import (
-    HumanitarianCSP, BacktrackingSolver, evaluate, diagnose_unassigned, make_demo_instance,
-)
-from optimization import (
-    mrv_degree_selector, lcv_value_orderer, forward_checking, forward_checking_ac3,
-)
-from humanitarian_csp.solver import static_var_selector, static_value_orderer, no_inference
 
 # ---------------------------------------------------------------------------
 # Page config
