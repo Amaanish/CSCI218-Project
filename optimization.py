@@ -20,8 +20,7 @@ Important modelling note:
 """
 from collections import deque
 
-from .csp import UNASSIGNED
-
+from humanitarian_csp.csp import UNASSIGNED
 
 # ---------------------------------------------------------------------------
 # Variable-ordering heuristics
