@@ -32,7 +32,7 @@ sys.path.insert(0, HERE)
 from humanitarian_csp import (
     HumanitarianCSP, BacktrackingSolver, evaluate, diagnose_unassigned, make_demo_instance,
 )
-from humanitarian_csp.optimization import (
+from optimization import (
     mrv_degree_selector, lcv_value_orderer, forward_checking, forward_checking_ac3,
 )
 from humanitarian_csp.solver import static_var_selector, static_value_orderer, no_inference
