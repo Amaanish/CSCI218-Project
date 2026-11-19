@@ -52,8 +52,7 @@ st.set_page_config(
     layout="wide",
 )
 
-st.title("✈️ Gaza Humanitarian Air Bridge — Cargo Scheduling CSP")
-st.caption("CSCI218 · Group 5 · University of Wollongong in Dubai · Autumn 2026")
+st.title("Gaza Humanitarian Air Bridge — Cargo Scheduling CSP")
 
 # ---------------------------------------------------------------------------
 # Sidebar: solver parameters
