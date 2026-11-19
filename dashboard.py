@@ -1,16 +1,3 @@
-"""
-dashboard.py -- Visual dashboard for the Gaza Humanitarian Air Bridge CSP.
-
-Displays:
-  - Live solver run with configurable parameters
-  - Flight schedule (Gantt-style timeline)
-  - Cargo assignment table
-  - Key metrics panel
-  - Experiment results (from experiments/results/raw_results.csv if present)
-
-Usage:
-    streamlit run dashboard.py
-"""
 
 import os
 import sys
@@ -19,15 +6,42 @@ from collections import defaultdict
 
 import matplotlib
 matplotlib.use("Agg")
+
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import numpy as np
 import pandas as pd
 import streamlit as st
 
-# Make the package importable when launched from the project root
+# Ensure the project root is on Python's import path
 HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, HERE)
+
+if HERE not in sys.path:
+    sys.path.insert(0, HERE)
+
+# Import CSP package
+from humanitarian_csp import (
+    HumanitarianCSP,
+    BacktrackingSolver,
+    evaluate,
+    diagnose_unassigned,
+    make_demo_instance,
+)
+
+# Import optimization functions from inside the package
+from humanitarian_csp.optimization import (
+    mrv_degree_selector,
+    lcv_value_orderer,
+    forward_checking,
+    forward_checking_ac3,
+)
+
+from humanitarian_csp.solver import (
+    static_var_selector,
+    static_value_orderer,
+    no_inference,
+)
+
 
 from humanitarian_csp import (
     HumanitarianCSP, BacktrackingSolver, evaluate, diagnose_unassigned, make_demo_instance,
